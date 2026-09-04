@@ -1,0 +1,19 @@
+paths:
+  cam1:
+    source: publisher
+    publishUser: user
+    publishPass: pass
+    readUser: user
+    readPass: pass
+  cam2:
+    source: publisher
+    publishUser: user
+    publishPass: pass
+    readUser: user
+    readPass: pass
+
+rtsp:
+  protocols: [tcp]
+
+http:
+  address: :8080

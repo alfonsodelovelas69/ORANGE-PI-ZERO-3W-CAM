@@ -1,18 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# --- Налаштування (змініть при потребі) ---
-WIFI_SSID="YOUR_SSID"
-WIFI_PASS="YOUR_WIFI_PASS"
-RTSP_USER="user"
-RTSP_PASS="pass"
-CAM_RES="1280x720"
-CAM_FPS="30"
-CAM_BITRATE="2000k"
-WORKDIR="$HOME/orangepi-mediamtx"
-# -----------------------------------------
+WIFI_SSID="${WIFI_SSID:-YOUR_SSID}"
+WIFI_PASS="${WIFI_PASS:-YOUR_WIFI_PASS}"
+RTSP_USER="${RTSP_USER:-user}"
+RTSP_PASS="${RTSP_PASS:-pass}"
+CAM_RES="${CAM_RES:-1280x720}"
+CAM_FPS="${CAM_FPS:-30}"
+CAM_BITRATE="${CAM_BITRATE:-2000k}"
+WORKDIR="${WORKDIR:-$HOME/orangepi-mediamtx}"
 
-# 1) Wi‑Fi конфіг (без редактора)
 sudo tee /etc/wpa_supplicant/wpa_supplicant.conf > /dev/null <<EOF
 ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
 update_config=1
@@ -24,11 +21,11 @@ network={
   key_mgmt=WPA-PSK
 }
 EOF
-sudo ip link set wlan0 up
+
+sudo ip link set wlan0 up || true
 sudo wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf || true
 sudo dhclient -v wlan0 || true
 
-# 2) Робоча папка і конфіги медіасервера
 mkdir -p "$WORKDIR"
 cd "$WORKDIR"
 
@@ -67,7 +64,6 @@ services:
     command: ["/mediamtx.yml"]
 EOF
 
-# 3) Утиліта чеку медіасервера
 sudo tee /usr/local/bin/wait_for_mediamtx.sh > /dev/null <<'EOF'
 #!/bin/bash
 TIMEOUT="${1:-60}"
@@ -79,7 +75,6 @@ exit 1
 EOF
 sudo chmod +x /usr/local/bin/wait_for_mediamtx.sh
 
-# 4) Скрипт запуску ffmpeg (використовує libx264 як запасний варіант)
 sudo tee /usr/local/bin/orangepi_cam_start.sh > /dev/null <<'EOF'
 #!/bin/bash
 set -u
@@ -151,7 +146,6 @@ done
 EOF
 sudo chmod +x /usr/local/bin/orangepi_cam_start.sh
 
-# 5) systemd юніти для двох камер
 sudo tee /etc/systemd/system/cam1.service > /dev/null <<EOF
 [Unit]
 Description=Publish /dev/cam1 to MediaMTX cam1
@@ -190,7 +184,6 @@ TimeoutStopSec=20
 WantedBy=multi-user.target
 EOF
 
-# 6) Файл за замовчуванням для камер
 sudo tee /etc/orangepi_cam.conf > /dev/null <<EOF
 CAM_RES=${CAM_RES}
 CAM_FPS=${CAM_FPS}
@@ -198,7 +191,6 @@ CAM_BITRATE=${CAM_BITRATE}
 EOF
 sudo chmod 644 /etc/orangepi_cam.conf
 
-# 7) Контрольний інтерфейс (меню)
 sudo tee /usr/local/bin/orangepi_control.sh > /dev/null <<'EOF'
 #!/bin/bash
 MEDIADIR="$HOME/orangepi-mediamtx"
@@ -287,12 +279,10 @@ done
 EOF
 sudo chmod +x /usr/local/bin/orangepi_control.sh
 
-# 8) Запустити docker і сервіси
 sudo systemctl daemon-reload
-sudo systemctl enable cam1.service cam2.service
+sudo systemctl enable cam1.service cam2.service || true
 cd "$WORKDIR"
-sudo docker compose pull || true
-sudo docker compose up -d
-sudo systemctl restart cam1.service cam2.service
+sudo docker compose up -d || true
+sudo systemctl restart cam1.service cam2.service || true
 
-echo "INSTALLER: done. Run 'sudo /usr/local/bin/orangepi_control.sh' to manage the system."
+echo "Installer complete. Run: sudo /usr/local/bin/orangepi_control.sh"

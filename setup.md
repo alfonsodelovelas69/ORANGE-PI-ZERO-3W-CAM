@@ -1,7 +1,13 @@
-#!/usr/bin/env bash
-set -euo pipefail
+# ORANGE PI ZERO 3W CAM — setup for PuTTY
 
-# --- Налаштування (змініть при потребі) ---
+Цей файл призначений для копіювання в PuTTY/SSH без редактора. Він створює базове середовище, налаштовує Wi‑Fi, MediaMTX, systemd-сервіси і запускає потоки з двох камер.
+
+> Перш ніж запускати, замініть `YOUR_SSID` і `YOUR_WIFI_PASS` на свої дані.
+
+```bash
+set -e
+
+# --- Налаштування ---
 WIFI_SSID="YOUR_SSID"
 WIFI_PASS="YOUR_WIFI_PASS"
 RTSP_USER="user"
@@ -10,9 +16,18 @@ CAM_RES="1280x720"
 CAM_FPS="30"
 CAM_BITRATE="2000k"
 WORKDIR="$HOME/orangepi-mediamtx"
-# -----------------------------------------
+# --------------------
 
-# 1) Wi‑Fi конфіг (без редактора)
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y curl wget ca-certificates gnupg lsb-release apt-transport-https \
+  iproute2 net-tools wireless-tools wpa_supplicant dhclient ffmpeg
+
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker $USER
+sudo apt install -y docker-compose-plugin
+newgrp docker || true
+
 sudo tee /etc/wpa_supplicant/wpa_supplicant.conf > /dev/null <<EOF
 ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
 update_config=1
@@ -24,11 +39,11 @@ network={
   key_mgmt=WPA-PSK
 }
 EOF
-sudo ip link set wlan0 up
+
+sudo ip link set wlan0 up || true
 sudo wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf || true
 sudo dhclient -v wlan0 || true
 
-# 2) Робоча папка і конфіги медіасервера
 mkdir -p "$WORKDIR"
 cd "$WORKDIR"
 
@@ -67,7 +82,6 @@ services:
     command: ["/mediamtx.yml"]
 EOF
 
-# 3) Утиліта чеку медіасервера
 sudo tee /usr/local/bin/wait_for_mediamtx.sh > /dev/null <<'EOF'
 #!/bin/bash
 TIMEOUT="${1:-60}"
@@ -79,7 +93,6 @@ exit 1
 EOF
 sudo chmod +x /usr/local/bin/wait_for_mediamtx.sh
 
-# 4) Скрипт запуску ffmpeg (використовує libx264 як запасний варіант)
 sudo tee /usr/local/bin/orangepi_cam_start.sh > /dev/null <<'EOF'
 #!/bin/bash
 set -u
@@ -100,7 +113,6 @@ done
 
 ENVFILE="/etc/orangepi_cam.conf"
 if [ -f "$ENVFILE" ]; then
-  # shellcheck disable=SC1090
   . "$ENVFILE"
 fi
 
@@ -151,7 +163,6 @@ done
 EOF
 sudo chmod +x /usr/local/bin/orangepi_cam_start.sh
 
-# 5) systemd юніти для двох камер
 sudo tee /etc/systemd/system/cam1.service > /dev/null <<EOF
 [Unit]
 Description=Publish /dev/cam1 to MediaMTX cam1
@@ -190,7 +201,6 @@ TimeoutStopSec=20
 WantedBy=multi-user.target
 EOF
 
-# 6) Файл за замовчуванням для камер
 sudo tee /etc/orangepi_cam.conf > /dev/null <<EOF
 CAM_RES=${CAM_RES}
 CAM_FPS=${CAM_FPS}
@@ -198,7 +208,6 @@ CAM_BITRATE=${CAM_BITRATE}
 EOF
 sudo chmod 644 /etc/orangepi_cam.conf
 
-# 7) Контрольний інтерфейс (меню)
 sudo tee /usr/local/bin/orangepi_control.sh > /dev/null <<'EOF'
 #!/bin/bash
 MEDIADIR="$HOME/orangepi-mediamtx"
@@ -287,12 +296,30 @@ done
 EOF
 sudo chmod +x /usr/local/bin/orangepi_control.sh
 
-# 8) Запустити docker і сервіси
 sudo systemctl daemon-reload
-sudo systemctl enable cam1.service cam2.service
+sudo systemctl enable cam1.service cam2.service || true
 cd "$WORKDIR"
-sudo docker compose pull || true
-sudo docker compose up -d
-sudo systemctl restart cam1.service cam2.service
+sudo docker compose up -d || true
+sudo systemctl restart cam1.service cam2.service || true
 
-echo "INSTALLER: done. Run 'sudo /usr/local/bin/orangepi_control.sh' to manage the system."
+echo "Installer complete. Run: sudo /usr/local/bin/orangepi_control.sh"
+```
+
+## Перевірка після запуску
+
+```bash
+ip -4 addr show wlan0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}' || hostname -I
+sudo ss -lntp | egrep '8554|8080' || true
+sudo docker logs mediamtx --tail 200
+sudo tail -n 80 /var/log/cam1.log
+sudo tail -n 80 /var/log/cam2.log
+```
+
+## RTSP адреси
+
+```text
+rtsp://user:pass@127.0.0.1:8554/cam1
+rtsp://user:pass@127.0.0.1:8554/cam2
+```
+
+Якщо зміните логін/пароль через control script — використовуйте нові значення замість `user:pass`.

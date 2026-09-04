@@ -41,6 +41,101 @@ ls -l /dev/video* /dev/cam*
 
 Після цього в конфігурації потоків треба використовувати саме `/dev/cam1` і `/dev/cam2`. Відключення однієї камери не повинно змінювати стабільне ім'я іншої.
 
+## Встановлення і налаштування MediaMTX
+
+MediaMTX — це легкий відеосервер, який приймає RTSP-потоки від `ffmpeg` і роздає їх AI-пристрою в локальній мережі. Він запускається в Docker-контейнері `mediamtx`, тому не потребує окремої ручної компіляції або встановлення бінарного файла на Orange Pi.
+
+У цьому проєкті використовується така схема:
+
+```text
+/dev/cam1 -> ffmpeg -> MediaMTX -> rtsp://ORANGE_PI_IP:8554/cam1
+/dev/cam2 -> ffmpeg -> MediaMTX -> rtsp://ORANGE_PI_IP:8554/cam2
+```
+
+### Встановлення Docker і запуск MediaMTX
+
+Якщо Docker ще не встановлений, виконайте в PuTTY:
+
+```bash
+sudo apt update
+sudo apt install -y docker.io docker-compose-plugin
+sudo systemctl enable --now docker
+sudo usermod -aG docker "$USER"
+```
+
+Після додавання користувача до групи Docker перелогіньтеся через PuTTY або виконайте `newgrp docker`.
+
+Створіть каталог і конфігураційні файли MediaMTX:
+
+```bash
+mkdir -p ~/orangepi-mediamtx
+cd ~/orangepi-mediamtx
+
+cat > mediamtx.yml <<'EOF'
+authInternalUsers:
+  users:
+    - user: user
+      password: pass
+
+paths:
+  cam1:
+    source: publisher
+  cam2:
+    source: publisher
+
+rtsp:
+  protocols: [tcp]
+
+http:
+  address: :8080
+EOF
+
+cat > docker-compose.yml <<'EOF'
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: mediamtx
+    restart: unless-stopped
+    network_mode: "host"
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml:ro
+    entrypoint: ["/mediamtx"]
+    command: ["/mediamtx.yml"]
+EOF
+
+sudo docker compose pull
+sudo docker compose up -d
+```
+
+### Пояснення конфігурації
+
+- `authInternalUsers` створює RTSP-користувача `user` з паролем `pass`. Змініть ці значення на власні.
+- `cam1` і `cam2` — два іменовані RTSP-шляхи, які приймають публікацію від `ffmpeg`.
+- `rtsp.protocols: [tcp]` використовує TCP, що зазвичай стабільніше за UDP через Wi-Fi.
+- `network_mode: "host"` дозволяє MediaMTX слухати порти Orange Pi без окремого Docker NAT.
+- порт `8554` використовується для RTSP, порт `8080` зарезервований під HTTP/API MediaMTX.
+- поле `version:` навмисно відсутнє, оскільки сучасний Docker Compose вважає його застарілим.
+
+### Перевірка MediaMTX
+
+```bash
+cd ~/orangepi-mediamtx
+sudo docker compose ps
+sudo docker logs mediamtx --tail 100
+sudo ss -lntp | grep -E '8554|8080' || true
+```
+
+Очікувано контейнер має статус `Up`, а порт `8554` має слухати на Orange Pi. Після запуску MediaMTX systemd-сервіси `cam1.service` і `cam2.service` публікують у нього потоки з `/dev/cam1` і `/dev/cam2`.
+
+RTSP-адреси для AI-пристрою:
+
+```text
+rtsp://user:pass@192.168.4.1:8554/cam1
+rtsp://user:pass@192.168.4.1:8554/cam2
+```
+
+Замість `192.168.4.1` використовуйте актуальну IP-адресу Orange Pi, якщо AI-пристрій підключений до іншої мережі.
+
 ## Короткий чек‑ліст відновлення
 
 ```bash

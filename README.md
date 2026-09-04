@@ -1,14 +1,5 @@
 # ORANGE PI ZERO 3W CAM
 
-Повний headless проєкт для запуску двох USB-камер на Orange Pi Zero 3W з RTSP-потоками через MediaMTX, ffmpeg, Docker і systemd.
-
-Проєкт дозволяє:
-- підключати Orange Pi до Wi‑Fi без графічного інтерфейсу;
-- запускати два відео-потоки через MediaMTX;
-- автоматично піднімати ffmpeg-перетворення в systemd;
-- керувати параметрами Wi‑Fi, RTSP і якістю відео без редагування в текстовому редакторі;
-- повторно відтворювати інсталяцію через PuTTY або SSH.
-
 ## Зміст
 - [Опис проєкту](#опис-проєкту)
 - [Вимоги](#вимоги)
@@ -22,6 +13,16 @@
 - [Адреси RTSP](#адреси-rtsp)
 - [Корисні команди](#корисні-команди)
 
+Повний headless проєкт для запуску двох USB-камер на Orange Pi Zero 3W з RTSP-потоками через MediaMTX, ffmpeg, Docker і systemd.
+
+Проєкт дозволяє:
+- підключати Orange Pi до Wi‑Fi без графічного інтерфейсу;
+- запускати два відео-потоки через MediaMTX;
+- автоматично піднімати ffmpeg-перетворення в systemd;
+- керувати параметрами Wi‑Fi, RTSP і якістю відео без редагування в текстовому редакторі;
+- повторно відтворювати інсталяцію через PuTTY або SSH.
+
+<a id="опис-проєкту"></a>
 ## Опис проєкту
 
 Цей проєкт створює повну headless-інсталяцію для Orange Pi Zero 3W. Він:
@@ -32,6 +33,7 @@
 - зберігає параметри якості у `/etc/orangepi_cam.conf`;
 - надає інтерфейс керування через `/usr/local/bin/orangepi_control.sh`.
 
+<a id="вимоги"></a>
 ## Вимоги
 
 - Orange Pi Zero 3W з SSH доступом через PuTTY або terminal;
@@ -48,6 +50,7 @@ sudo apt install -y curl wget ca-certificates gnupg lsb-release apt-transport-ht
   iproute2 net-tools wireless-tools wpa_supplicant dhclient ffmpeg docker-compose-plugin
 ```
 
+<a id="швидкий-старт"></a>
 ## Швидкий старт
 
 Після копіювання файлів проєкту в папку на Orange Pi виконайте:
@@ -63,6 +66,7 @@ WIFI_SSID="YOUR_SSID" WIFI_PASS="YOUR_WIFI_PASS" bash ./installer.sh
 sudo /usr/local/bin/orangepi_control.sh
 ```
 
+<a id="структура-проєкту"></a>
 ## Структура проєкту
 
 ```text
@@ -86,6 +90,7 @@ ORANGE-PI-ZERO-3W-CAM/
 - `orangepi_control.sh` — меню управління Wi‑Fi, RTSP, стартом/зупинкою сервісів.
 - `.gitignore` — стандартні файли для виключення логів і тимчасових даних.
 
+<a id="розгортання-через-putty"></a>
 ## Розгортання через PuTTY
 
 ### 1. Підготовка системи
@@ -126,6 +131,7 @@ WIFI_SSID="YOUR_SSID" WIFI_PASS="YOUR_WIFI_PASS" bash ./installer.sh
 
 > Для headless режиму важливо вставляти блоки цілими командами, не відкривати редактор у терміналі, щоб не втратити з’єднання через затримку.
 
+<a id="після-встановлення"></a>
 ## Після встановлення
 
 Перевірка інтернету і IP:
@@ -150,6 +156,7 @@ cd ~/orangepi-mediamtx
 sudo docker compose up -d
 ```
 
+<a id="робота-з-камерами"></a>
 ## Робота з камерами
 
 ### Перевірка доступних пристроїв
@@ -186,6 +193,7 @@ sudo v4l2-ctl -d /dev/cam1 --set-parm=30
 v4l2-ctl -d /dev/cam1 --all
 ```
 
+<a id="зміна-якості-відео"></a>
 ## Зміна якості відео
 
 Файл `/etc/orangepi_cam.conf` відповідає за якість:
@@ -205,6 +213,7 @@ sudo systemctl daemon-reload
 sudo systemctl restart cam1.service cam2.service
 ```
 
+<a id="типові-проблеми"></a>
 ## Типові проблеми
 
 ### 1. `no configuration file provided`
@@ -249,6 +258,7 @@ sudo docker logs mediamtx --tail 200
 sudo journalctl -u cam1.service -n 80 --no-pager
 ```
 
+<a id="адреси-rtsp"></a>
 ## Адреси RTSP
 
 Локально на Orange Pi:
@@ -269,6 +279,7 @@ rtsp://user:pass@192.168.1.50:8554/cam2
 - `user` і `pass` — RTSP логін/пароль;
 - `192.168.1.50` — IP вашого Orange Pi.
 
+<a id="корисні-команди"></a>
 ## Корисні команди
 
 ```bash

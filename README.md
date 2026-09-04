@@ -251,10 +251,24 @@ sudo docker compose up -d
 
 ### 2. `hw encoder not found`
 
-Скрипт у проєкті використовує `libx264` за замовчуванням. Якщо потрібно апаратне кодування, перевіряйте доступні кодеки:
+Скрипт використовує `CAM_ENCODER=auto`: він перевіряє encoder `h264_v4l2m2m`, пристрій `CAM_HW_DEVICE` і виконує пробне кодування. Якщо будь-яка перевірка не проходить, автоматично використовується стабільний `libx264`.
 
 ```bash
 ffmpeg -encoders | grep -i h264
+ls -l /dev/video11
+```
+
+Для ручного режиму можна задати параметри у `/etc/orangepi_cam.conf`:
+
+```bash
+CAM_ENCODER=auto       # auto або hardware
+CAM_HW_DEVICE=/dev/video11
+```
+
+Після зміни перезапустіть сервіси:
+
+```bash
+sudo systemctl restart cam1.service cam2.service
 ```
 
 ### 3. `Broken pipe` або пропуски кадрів

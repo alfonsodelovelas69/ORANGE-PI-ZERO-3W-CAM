@@ -29,10 +29,8 @@ set_rtsp_creds(){
   read -p "RTSP user: " U
   read -s -p "RTSP pass: " P
   echo
-  sed -i "s#publishUser: .*#publishUser: ${U}#" "$MEDIADIR/mediamtx.yml" || true
-  sed -i "s#publishPass: .*#publishPass: ${P}#" "$MEDIADIR/mediamtx.yml" || true
-  sed -i "s#readUser: .*#readUser: ${U}#" "$MEDIADIR/mediamtx.yml" || true
-  sed -i "s#readPass: .*#readPass: ${P}#" "$MEDIADIR/mediamtx.yml" || true
+  sed -i "s#^\s*user: .*#    user: ${U}#" "$MEDIADIR/mediamtx.yml" || true
+  sed -i "s#^\s*password: .*#      password: ${P}#" "$MEDIADIR/mediamtx.yml" || true
   sudo sed -i "s#^ExecStart=.*cam1 .*#ExecStart=/bin/bash /usr/local/bin/orangepi_cam_start.sh /dev/cam1 cam1 ${U} ${P}#" /etc/systemd/system/cam1.service || true
   sudo sed -i "s#^ExecStart=.*cam2 .*#ExecStart=/bin/bash /usr/local/bin/orangepi_cam_start.sh /dev/cam2 cam2 ${U} ${P}#" /etc/systemd/system/cam2.service || true
   sudo systemctl daemon-reload

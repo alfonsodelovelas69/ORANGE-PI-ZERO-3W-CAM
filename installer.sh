@@ -99,6 +99,20 @@ fi
 RES="${CAM_RES:-1280x720}"
 FPS="${CAM_FPS:-30}"
 BR="${CAM_BITRATE:-2000k}"
+ENCODER_MODE="${CAM_ENCODER:-auto}"
+HW_DEVICE="${CAM_HW_DEVICE:-/dev/video11}"
+
+ENCODER_ARGS=(-c:v libx264 -preset ultrafast -tune zerolatency)
+if [[ "$ENCODER_MODE" == "hardware" || "$ENCODER_MODE" == "auto" ]] \
+  && [[ -e "$HW_DEVICE" ]] \
+  && /usr/bin/ffmpeg -hide_banner -encoders 2>/dev/null | grep -q 'h264_v4l2m2m' \
+  && /usr/bin/ffmpeg -hide_banner -loglevel error -f lavfi -i color=size=16x16:rate=1 \
+      -frames:v 1 -c:v h264_v4l2m2m -f null - >/dev/null 2>&1; then
+  ENCODER_ARGS=(-c:v h264_v4l2m2m)
+  echo "Using hardware encoder h264_v4l2m2m on $HW_DEVICE"
+else
+  [[ "$ENCODER_MODE" == "hardware" ]] && echo "Hardware encoder unavailable; using libx264"
+fi
 
 CMD=(
   /usr/bin/ffmpeg
@@ -113,9 +127,7 @@ CMD=(
   -analyzeduration 5000000
   -i "$DEV"
   -an
-  -c:v libx264
-  -preset ultrafast
-  -tune zerolatency
+  "${ENCODER_ARGS[@]}"
   -r "$FPS"
   -b:v "$BR"
   -maxrate "$BR"

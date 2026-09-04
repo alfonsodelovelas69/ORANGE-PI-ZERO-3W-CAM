@@ -136,7 +136,16 @@ if [ -f "$ENVFILE" ]; then . "$ENVFILE"; fi
 RES="${CAM_RES:-1280x720}"
 FPS="${CAM_FPS:-30}"
 BR="${CAM_BITRATE:-2000k}"
-CMD=(/usr/bin/ffmpeg -hide_banner -loglevel info -f v4l2 -input_format mjpeg -thread_queue_size 2048 -framerate "$FPS" -video_size "$RES" -probesize 5000000 -analyzeduration 5000000 -i "$DEV" -an -c:v libx264 -preset ultrafast -tune zerolatency -r "$FPS" -b:v "$BR" -maxrate "$BR" -bufsize 7000k -fflags nobuffer -flags low_delay -rtsp_transport tcp -f rtsp "rtsp://${USER}:${PASS}@127.0.0.1:8554/${STREAM_NAME}")
+ENCODER_MODE="${CAM_ENCODER:-auto}"
+HW_DEVICE="${CAM_HW_DEVICE:-/dev/video11}"
+ENCODER_ARGS=(-c:v libx264 -preset ultrafast -tune zerolatency)
+if [[ "$ENCODER_MODE" == "hardware" || "$ENCODER_MODE" == "auto" ]] && [[ -e "$HW_DEVICE" ]] && /usr/bin/ffmpeg -hide_banner -encoders 2>/dev/null | grep -q 'h264_v4l2m2m' && /usr/bin/ffmpeg -hide_banner -loglevel error -f lavfi -i color=size=16x16:rate=1 -frames:v 1 -c:v h264_v4l2m2m -f null - >/dev/null 2>&1; then
+  ENCODER_ARGS=(-c:v h264_v4l2m2m)
+  echo "Using hardware encoder h264_v4l2m2m on $HW_DEVICE"
+else
+  [[ "$ENCODER_MODE" == "hardware" ]] && echo "Hardware encoder unavailable; using libx264"
+fi
+CMD=(/usr/bin/ffmpeg -hide_banner -loglevel info -f v4l2 -input_format mjpeg -thread_queue_size 2048 -framerate "$FPS" -video_size "$RES" -probesize 5000000 -analyzeduration 5000000 -i "$DEV" -an "${ENCODER_ARGS[@]}" -r "$FPS" -b:v "$BR" -maxrate "$BR" -bufsize 7000k -fflags nobuffer -flags low_delay -rtsp_transport tcp -f rtsp "rtsp://${USER}:${PASS}@127.0.0.1:8554/${STREAM_NAME}")
 while true; do
   "${CMD[@]}"
   rc=$?
@@ -212,6 +221,7 @@ country=UA
 network={ ssid="${SSID}" psk="${PASS}" key_mgmt=WPA-PSK }
 W
 sudo ip link set wlan0 up; sudo wpa_cli -i wlan0 reconfigure || sudo wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf; sudo dhclient -v wlan0 || true; ip -4 addr show wlan0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}' || hostname -I; }
+set_rtsp_creds(){ read -p "RTSP user: " U; read -s -p "RTSP pass: " P; echo; sed -i "s#^\s*user: .*#    user: ${U}#" "$MEDIADIR/mediamtx.yml" || true; sed -i "s#^\s*password: .*#      password: ${P}#" "$MEDIADIR/mediamtx.yml" || true; sudo sed -i "s#^ExecStart=.*cam1 .*#ExecStart=/bin/bash /usr/local/bin/orangepi_cam_start.sh /dev/cam1 cam1 ${U} ${P}#" /etc/systemd/system/cam1.service || true; sudo sed -i "s#^ExecStart=.*cam2 .*#ExecStart=/bin/bash /usr/local/bin/orangepi_cam_start.sh /dev/cam2 cam2 ${U} ${P}#" /etc/systemd/system/cam2.service || true; sudo systemctl daemon-reload; echo "RTSP updated."; }
 set_rtsp_creds(){ read -p "RTSP user: " U; read -s -p "RTSP pass: " P; echo; sed -i "s#^\s*user: .*#    user: ${U}#" "$MEDIADIR/mediamtx.yml" || true; sed -i "s#^\s*password: .*#      password: ${P}#" "$MEDIADIR/mediamtx.yml" || true; sudo sed -i "s#^ExecStart=.*cam1 .*#ExecStart=/bin/bash /usr/local/bin/orangepi_cam_start.sh /dev/cam1 cam1 ${U} ${P}#" /etc/systemd/system/cam1.service || true; sudo sed -i "s#^ExecStart=.*cam2 .*#ExecStart=/bin/bash /usr/local/bin/orangepi_cam_start.sh /dev/cam2 cam2 ${U} ${P}#" /etc/systemd/system/cam2.service || true; sudo systemctl daemon-reload; echo "RTSP updated."; }
 set_cam_defaults(){ read -p "Resolution (e.g. 1280x720): " R; read -p "FPS (e.g. 30): " F; read -p "Bitrate (e.g. 2000k): " B; sudo tee /etc/orangepi_cam.conf > /dev/null <<E
 CAM_RES=${R}

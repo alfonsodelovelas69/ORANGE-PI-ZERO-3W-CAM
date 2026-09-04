@@ -131,6 +131,28 @@ WIFI_SSID="YOUR_SSID" WIFI_PASS="YOUR_WIFI_PASS" bash ./installer.sh
 
 > Для headless режиму важливо вставляти блоки цілими командами, не відкривати редактор у терміналі, щоб не втратити з’єднання через затримку.
 
+### Стабільні налаштування для MediaMTX
+
+Поточні версії MediaMTX видають попередження про застарілі параметри автентифікації. Для стабільної роботи варто використовувати блок `authInternalUsers` замість застарілих `publishUser` / `readUser` / `publishPass` / `readPass` у секціях `paths`.
+
+```yaml
+authInternalUsers:
+  users:
+    - user: user
+      password: pass
+
+paths:
+  cam1:
+    source: publisher
+  cam2:
+    source: publisher
+
+rtsp:
+  protocols: [tcp]
+```
+
+Це не критична помилка, але вона запобігає попередженням при оновленні MediaMTX у майбутніх версіях.
+
 <a id="після-встановлення"></a>
 ## Після встановлення
 
@@ -246,6 +268,39 @@ CAM_FPS=20
 CAM_BITRATE=1500k
 EOF'
 sudo systemctl restart cam1.service cam2.service
+```
+
+### 5. Попередження про deprecated auth
+
+```text
+you are using one or more authentication-related deprecated parameters
+```
+
+Це не зриває роботу, але краще оновити `mediamtx.yml` до `authInternalUsers`.
+
+### 6. `RTP packets are too big`
+
+Попередження про розмір RTP-пакетів не є смертельним, але вимагає уваги при тривалому стрімі. Для стабільної роботи обирають роздільну здатність `1280x720` і bitrate `2000k`.
+
+### 7. `docker compose warning: version attribute is obsolete`
+
+Поле `version:` у `docker-compose.yml` більше не потрібно. Його краще видалити, бо сучасні `docker compose` виводять попередження.
+
+## Швидкий чек‑ліст відновлення
+
+```bash
+cd ~/orangepi-mediamtx && sudo sed -i '/^version:/d' docker-compose.yml
+sudo bash -c 'cat > /etc/orangepi_cam.conf <<EOF
+CAM_RES=1280x720
+CAM_FPS=30
+CAM_BITRATE=2000k
+EOF'
+sudo chmod 644 /etc/orangepi_cam.conf
+sudo systemctl daemon-reload
+sudo systemctl restart cam1.service cam2.service
+cd ~/orangepi-mediamtx && sudo docker compose pull || true && sudo docker compose up -d
+sudo tail -n 80 /var/log/cam1.log
+ip -4 addr show wlan0 | grep -oP "(?<=inet\s)\d+(\.\d+){3}" || hostname -I
 ```
 
 ### 4. Потік не піднімається

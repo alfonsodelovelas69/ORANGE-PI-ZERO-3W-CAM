@@ -2,6 +2,33 @@
 
 Нижче один блок для вставки в PuTTY. Він виконується по порядку зверху вниз.
 
+## Короткий чек‑ліст відновлення
+
+```bash
+cd ~/orangepi-mediamtx && sudo sed -i '/^version:/d' docker-compose.yml
+sudo bash -c 'cat > /etc/orangepi_cam.conf <<EOF
+CAM_RES=1280x720
+CAM_FPS=30
+CAM_BITRATE=2000k
+EOF'
+sudo chmod 644 /etc/orangepi_cam.conf
+sudo systemctl daemon-reload
+sudo systemctl restart cam1.service cam2.service
+cd ~/orangepi-mediamtx && sudo docker compose pull || true && sudo docker compose up -d
+sudo tail -n 80 /var/log/cam1.log
+ip -4 addr show wlan0 | grep -oP "(?<=inet\s)\d+(\.\d+){3}" || hostname -I
+```
+
+Пояснення:
+- перший рядок прибирає застаріле поле `version:` з `docker-compose.yml`;
+- другий блок задає стабільні параметри камер `1280x720 @ 30fps / 2000k`;
+- `systemctl restart` перезапускає ffmpeg-публікації;
+- `docker compose up -d` піднімає або оновлює MediaMTX;
+- `tail` показує логи для перевірки стану;
+- остання команда показує IP пристрою в мережі.
+
+Після цього можна знову перевірити RTSP-адреси і статус сервісів.
+
 1) Спочатку замініть свої дані: `YOUR_SSID` і `YOUR_WIFI_PASS`.
 2) Після вставки весь блок виконується автоматично.
 3) Якщо програма попросить введення з клавіатури, вводьте значення і натискайте Enter.
@@ -48,19 +75,16 @@ sudo dhclient -v wlan0 || true
 # Блок 4: створення папки, медіасервера і конфігів
 mkdir -p "$WORKDIR" && cd "$WORKDIR"
 cat > mediamtx.yml <<EOF
+authInternalUsers:
+  users:
+    - user: ${RTSP_USER}
+      password: ${RTSP_PASS}
+
 paths:
   cam1:
     source: publisher
-    publishUser: ${RTSP_USER}
-    publishPass: ${RTSP_PASS}
-    readUser: ${RTSP_USER}
-    readPass: ${RTSP_PASS}
   cam2:
     source: publisher
-    publishUser: ${RTSP_USER}
-    publishPass: ${RTSP_PASS}
-    readUser: ${RTSP_USER}
-    readPass: ${RTSP_PASS}
 rtsp:
   protocols: [tcp]
 http:
@@ -188,7 +212,7 @@ country=UA
 network={ ssid="${SSID}" psk="${PASS}" key_mgmt=WPA-PSK }
 W
 sudo ip link set wlan0 up; sudo wpa_cli -i wlan0 reconfigure || sudo wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf; sudo dhclient -v wlan0 || true; ip -4 addr show wlan0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}' || hostname -I; }
-set_rtsp_creds(){ read -p "RTSP user: " U; read -s -p "RTSP pass: " P; echo; sed -i "s#publishUser: .*#publishUser: ${U}#" "$MEDIADIR/mediamtx.yml" || true; sed -i "s#publishPass: .*#publishPass: ${P}#" "$MEDIADIR/mediamtx.yml" || true; sudo sed -i "s#^ExecStart=.*cam1 .*#ExecStart=/bin/bash /usr/local/bin/orangepi_cam_start.sh /dev/cam1 cam1 ${U} ${P}#" /etc/systemd/system/cam1.service || true; sudo sed -i "s#^ExecStart=.*cam2 .*#ExecStart=/bin/bash /usr/local/bin/orangepi_cam_start.sh /dev/cam2 cam2 ${U} ${P}#" /etc/systemd/system/cam2.service || true; sudo systemctl daemon-reload; echo "RTSP updated."; }
+set_rtsp_creds(){ read -p "RTSP user: " U; read -s -p "RTSP pass: " P; echo; sed -i "s#^\s*user: .*#    user: ${U}#" "$MEDIADIR/mediamtx.yml" || true; sed -i "s#^\s*password: .*#      password: ${P}#" "$MEDIADIR/mediamtx.yml" || true; sudo sed -i "s#^ExecStart=.*cam1 .*#ExecStart=/bin/bash /usr/local/bin/orangepi_cam_start.sh /dev/cam1 cam1 ${U} ${P}#" /etc/systemd/system/cam1.service || true; sudo sed -i "s#^ExecStart=.*cam2 .*#ExecStart=/bin/bash /usr/local/bin/orangepi_cam_start.sh /dev/cam2 cam2 ${U} ${P}#" /etc/systemd/system/cam2.service || true; sudo systemctl daemon-reload; echo "RTSP updated."; }
 set_cam_defaults(){ read -p "Resolution (e.g. 1280x720): " R; read -p "FPS (e.g. 30): " F; read -p "Bitrate (e.g. 2000k): " B; sudo tee /etc/orangepi_cam.conf > /dev/null <<E
 CAM_RES=${R}
 CAM_FPS=${F}

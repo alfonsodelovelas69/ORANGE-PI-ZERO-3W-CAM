@@ -33,19 +33,16 @@ mkdir -p "$WORKDIR"
 cd "$WORKDIR"
 
 cat > mediamtx.yml <<EOF
+authInternalUsers:
+  users:
+    - user: ${RTSP_USER}
+      password: ${RTSP_PASS}
+
 paths:
   cam1:
     source: publisher
-    publishUser: ${RTSP_USER}
-    publishPass: ${RTSP_PASS}
-    readUser: ${RTSP_USER}
-    readPass: ${RTSP_PASS}
   cam2:
     source: publisher
-    publishUser: ${RTSP_USER}
-    publishPass: ${RTSP_PASS}
-    readUser: ${RTSP_USER}
-    readPass: ${RTSP_PASS}
 
 rtsp:
   protocols: [tcp]

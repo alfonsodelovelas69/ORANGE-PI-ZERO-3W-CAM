@@ -2,6 +2,45 @@
 
 Нижче один блок для вставки в PuTTY. Він виконується по порядку зверху вниз.
 
+## Стабільні імена камер udev
+
+Кожна камера OPENAICAM створює кілька відеоінтерфейсів. У вашій системі основні відеопристрої мають `index==0`, а metadata-інтерфейси не використовуються. Номери `/dev/videoN` можуть змінитися після перепідключення, тому сервіси працюватимуть через стабільні посилання `/dev/cam1` і `/dev/cam2`.
+
+Виконайте цей блок у PuTTY після підключення обох камер:
+
+```bash
+sudo tee /etc/udev/rules.d/99-orangepi-cameras.rules > /dev/null <<'EOF'
+# Orange Pi Zero 3W - fixed camera names
+# CAM1 = xHCI USB port -> /dev/cam1
+SUBSYSTEM=="video4linux", KERNEL=="video[0-9]*", KERNELS=="1-1:1.0", ATTR{name}=="OPENAICAM: OPENAICAM", ATTR{index}=="0", SYMLINK+="cam1", MODE="0666"
+
+# CAM2 = EHCI USB port -> /dev/cam2
+SUBSYSTEM=="video4linux", KERNEL=="video[0-9]*", KERNELS=="5-1:1.0", ATTR{name}=="OPENAICAM: OPENAICAM", ATTR{index}=="0", SYMLINK+="cam2", MODE="0666"
+EOF
+
+sudo udevadm control --reload-rules
+sudo udevadm trigger --subsystem-match=video4linux
+ls -l /dev/cam1 /dev/cam2
+```
+
+Очікуваний результат:
+
+```text
+/dev/cam1 -> /dev/video0
+/dev/cam2 -> /dev/video2
+```
+
+`KERNELS=="1-1:1.0"` і `KERNELS=="5-1:1.0"` прив'язують камери до фізичних USB-портів, а не до змінних номерів `/dev/videoN`. `ATTR{index}=="0"` вибирає основний відеопотік і відсікає metadata-інтерфейси `/dev/video1` та `/dev/video3`.
+
+Перевірити відповідність можна командами:
+
+```bash
+v4l2-ctl --list-devices
+ls -l /dev/video* /dev/cam*
+```
+
+Після цього в конфігурації потоків треба використовувати саме `/dev/cam1` і `/dev/cam2`. Відключення однієї камери не повинно змінювати стабільне ім'я іншої.
+
 ## Короткий чек‑ліст відновлення
 
 ```bash
